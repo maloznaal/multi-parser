@@ -1,0 +1,13 @@
+version: '2'
+
+services:
+
+  # single instance should be enough
+  # passing prefix to volume for compatible testing mac->linux
+  gpfdist:
+    build: .
+    volumes:
+      - /Users/Nursultan/volumes/test/czips:/app/czips
+    ports:
+      - 3300:8888
+    command: /usr/lib/gpdb/bin/gpfdist -d /app/czips/ -p 8888

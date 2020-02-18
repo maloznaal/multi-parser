@@ -1,0 +1,33 @@
+version: '2'
+services:
+  master:
+    image: gpdb5_centos7
+    ports:
+    - 5433:5432
+    links: 
+    - segment
+    volumes:
+    - pgdata:/gpdata 
+    networks:
+      gp_centos7_net:
+
+
+  segment:
+    image: gpdb5_centos7
+    entrypoint: gpdb-seg-entrypoint.sh 
+    volumes:
+    - pgdata:/gpdata
+    networks:
+      gp_centos7_net:
+
+volumes: 
+  pgdata:
+
+networks:
+  gp_centos7_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      -
+        subnet: 172.10.240.0/24

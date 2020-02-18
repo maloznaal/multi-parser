@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  parser:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes: #dirty zips volume
+      - /Users/demo/volumes/prod/zips:/app/zips
+      - /Users/demo/volumes/smsc/logs:/var/log
+    environment: #pass prod vars
+      - TEST=-1
+    networks:
+      - backend
+
+  gpfdist:
+    build: gp/gpfdist
+    volumes:
+      - /Users/demo/volumes/prod/czips:/app/czips
+    command: /usr/lib/gpdb/bin/gpfdist -d /app/czips/ -p 8888
+    networks:
+      - backend
+
+
+networks:
+  backend:  

@@ -1,0 +1,7 @@
+[ADB_5_21_4_arenadata6_centos7]
+name=ADB_5_21_4_arenadata6_centos7
+baseurl=https://storage.googleapis.com/arenadata-repo/ADB/5.21.4_arenadata6/centos7/
+gpgcheck=0
+enabled=1
+priority=1
+
