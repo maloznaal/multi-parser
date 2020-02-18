@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 const (
 	Headers  = "record_type,record_id,start_timestamp,calling_party_number,called_party_number,redirecting_number,call_id_number,supplementary_services,cause,calling_party_category,call_duration,call_status,connected_number,imsi_calling,imei_calling,imsi_called,imei_called,msisdn_calling,msisdn_called,msc_number,vlr_number,location_lac,location_cell,forwarding_reason,roaming_number,ss_code,ussd,operator_id,date_and_time,call_direction,seizure_time,answer_time,release_time"
-	S  = "ABCDE0123456789" // alphabet
 )
 
 // position of headers 0-based
@@ -29,8 +29,6 @@ const (
 	imsiPos = 12
 	mscPos = 13
 )
-
-var r = []rune(S)
 
 // HandleError handles error
 func HandleError(err error, msg string) {
@@ -104,18 +102,18 @@ func WriteJob(file string, dir string, cdrs []CDR) {
 }
 
 // ParseJob parses slice of strings in place -> ready for writing
-func ParseJob(valz [][]string, m *map[string]bool) []CDR{
+func ParseJob(valz [][]string) []CDR{
 	recID := ""
 	cdrs := make([]CDR, 0)
 	for _, chunks := range valz {
 		c, r := chunks[num1Pos], chunks[num2Pos]
 		suf := c[3:]
-		if len(c) > 11 && AreDigits(suf) && (*m)[c[:3]] {
+		if len(c) > 11 && AreDigits(suf) && isDirty(c[:3]) {
 			chunks[3] = suf
 		}
 
 		suf = r[3:]
-		if len(r) > 11 && AreDigits(suf) && (*m)[r[:3]] {
+		if len(r) > 11 && AreDigits(suf) && isDirty(r[:3]) {
 			chunks[4] = suf
 		}
 
@@ -140,30 +138,31 @@ func ParseJob(valz [][]string, m *map[string]bool) []CDR{
 			cdr.CalledPartyNumber = chunks[num1Pos]
 		}
 
-		// short number is abonent probably
+		// number < 9 digits, abonent
 		if len(cdr.CalledPartyNumber) < 9 || !AreDigits(cdr.CalledPartyNumber) {
 			cdr.RecordType = 18001
 		} else {
-			cdr.RecordType = 18000 // mt
+			cdr.RecordType = 18000
 		}
 
 
 		ts, err := PostgresTime(chunks[datePos])
 		if err != nil {
 			HandleError(err, "err parsing time")
-			continue // skip record
+			continue
 		}
-		cdr.StartTimestamp = ts
-		cdr.DateAndTime = ts
+		cdr.StartTimestamp = time.Time{}
+		cdr.DateAndTime = time.Time{}
 
 		cdr.MscNumber = chunks[mscPos]
 		cdr.ImsiCalled = chunks[imsiPos]
 
-		cdr.SeizureTime = ts
-		cdr.AnswerTime = ts
-		cdr.ReleaseTime = ts
-		//cdr.MsisdnCalled = chunks[mscPos]
+		cdr.SeizureTime = time.Time{}
+		cdr.AnswerTime = time.Time{}
+		cdr.ReleaseTime = time.Time{}
+		//cdr.MsisdnCalled = chunks[mscPos] // not true for some records, msc != msisdn(caller,receiver) always
 		cdr.MscNumber = chunks[mscPos]
+		cdr.DateToWrite = ts
 		cdrs = append(cdrs, cdr)
 	}
 	return cdrs
@@ -214,16 +213,29 @@ func AreDigits(suf string) bool {
 	return true
 }
 
-// Gen  - generates all permuts of size k=3 with alphabet size - n, excluding all only digit subsets from result set
-func Gen(n int, k int, res string, m *map[string]bool) {
-	if k == 0 {
-		if !AreDigits(res) {
-			(*m)[res] = true
+func isDirty(pref string) bool {
+	cntL := 0
+	for _, c := range pref {
+		if unicode.IsLetter(c) {
+			cntL++
 		}
-		return
 	}
-	for i := 0; i < n; i++ {
-		prefix := res + string(r[i])
-		Gen(n, k-1, prefix, m)
+	if cntL == 0 {
+		return false
 	}
+	return true
 }
+
+// Gen  - generates all permuts of size k=3 with alphabet size - n, excluding all only digit subsets from result set
+//func Gen(n int, k int, res string, m *map[string]bool) {
+//	if k == 0 {
+//		if !AreDigits(res) {
+//			(*m)[res] = true
+//		}
+//		return
+//	}
+//	for i := 0; i < n; i++ {
+//		prefix := res + string(r[i])
+//		Gen(n, k-1, prefix, m)
+//	}
+//}

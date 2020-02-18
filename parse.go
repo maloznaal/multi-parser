@@ -20,7 +20,6 @@ import (
 
 var zipNames []string
 
-var m = map[string]bool{}
 var c Config
 var test_mode = 0
 
@@ -52,7 +51,6 @@ const (
 )
 
 func init() {
-	utils.Gen(len(utils.S), 3, "", &m)
 	if os.Getenv("TEST") != "" {
 		test_mode, _ = strconv.Atoi(os.Getenv("TEST"))
 	}
@@ -244,7 +242,7 @@ func main() {
 				return nil
 			}
 			valz := utils.ReadCsv(f, zname)
-			cdrs := utils.ParseJob(valz, &m)
+			cdrs := utils.ParseJob(valz)
 			utils.WriteJob(f.Name(), tmpDirName, cdrs)
 			return nil
 		})

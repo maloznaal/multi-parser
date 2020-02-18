@@ -2,13 +2,14 @@ package utils
 
 import (
 	"strconv"
+	"time"
 )
 
 // CDR record
 type CDR struct {
 	RecordType            int
 	RecordID              int32
-	StartTimestamp        string // time.Time
+	StartTimestamp        time.Time
 	CallingPartyNumber    string
 	CalledPartyNumber     string
 	RedirectingNumber     string
@@ -34,11 +35,12 @@ type CDR struct {
 	SsCode                string
 	Ussd                  string
 	OperatorID            int
-	DateAndTime           string
+	DateAndTime           time.Time
 	CallDirection         int
-	SeizureTime           string
-	AnswerTime            string
-	ReleaseTime           string
+	SeizureTime           time.Time
+	AnswerTime            time.Time
+	ReleaseTime           time.Time
+	DateToWrite string
 }
 
 // NewCdr create new instance of Cdr with default fields
@@ -47,7 +49,7 @@ func NewCdr() CDR {
 	c := CDR{}
 	c.RecordType = -1
 	c.RecordID = -1
-	c.StartTimestamp = "-"
+	c.StartTimestamp = time.Time{}
 	c.CallingPartyNumber = "-"
 	c.CalledPartyNumber = "-"
 	c.RedirectingNumber = "-"
@@ -73,11 +75,12 @@ func NewCdr() CDR {
 	c.SsCode = "-"
 	c.Ussd = "-"
 	c.OperatorID = -1
-	c.DateAndTime = "-"
+	c.DateAndTime = time.Time{}
 	c.CallDirection = -1
-	c.SeizureTime = "-"
-	c.AnswerTime = "-"
-	c.ReleaseTime = "-"
+	c.SeizureTime = time.Time{}
+	c.AnswerTime = time.Time{}
+	c.ReleaseTime = time.Time{}
+	c.DateToWrite = "-"
 	return c
 }
 
@@ -87,7 +90,7 @@ func (c CDR) csvRow() []string {
 	cdrs = append(cdrs, strconv.Itoa(c.RecordType))
 
 	cdrs = append(cdrs, fastConvert(c.RecordID))
-	cdrs = append(cdrs, c.StartTimestamp)
+	cdrs = append(cdrs, c.DateToWrite)
 	cdrs = append(cdrs, c.CallingPartyNumber)
 	cdrs = append(cdrs, c.CalledPartyNumber)
 	cdrs = append(cdrs, c.RedirectingNumber)
@@ -106,9 +109,9 @@ func (c CDR) csvRow() []string {
 	cdrs = append(cdrs, strconv.Itoa(c.VlrNumber), strconv.Itoa(c.LocationLac), strconv.Itoa(c.LocationCell), strconv.Itoa(c.ForwardingReason))
 	cdrs = append(cdrs, c.RoamingNumber, c.SsCode, c.Ussd)
 	cdrs = append(cdrs, strconv.Itoa(c.OperatorID))
-	cdrs = append(cdrs, c.DateAndTime)
+	cdrs = append(cdrs, c.DateToWrite)
 	cdrs = append(cdrs, strconv.Itoa(c.CallDirection))
-	cdrs = append(cdrs, c.SeizureTime, c.AnswerTime, c.ReleaseTime)
+	cdrs = append(cdrs, c.DateToWrite, c.DateToWrite, c.DateToWrite) // time.Time
 
 	return cdrs
 }
