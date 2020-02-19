@@ -20,18 +20,7 @@ import (
 
 var zipNames []string
 
-var c Config
 var test_mode = 0
-
-type Config struct {
-	dbProps struct {
-		PG_USERNAME string
-		PG_PASSWORD string
-		PG_DBNAME string
-		PG_PORT int
-		PG_HOST string
-	}
-}
 
 // const paths
 const (
