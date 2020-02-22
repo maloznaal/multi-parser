@@ -4,7 +4,6 @@ import (
 	"compress/flate"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"offline_parser/utils"
@@ -15,12 +14,11 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/mholt/archiver/v3"
+	"github.com/streadway/amqp"
 )
 
-
-var zipNames []string
-
 var test_mode = 0
+var gpfdistAddr string
 
 // const paths
 const (
@@ -28,7 +26,6 @@ const (
 	tmpDirPath   = "/app/tmp/"
 	cleanZipPath = "/app/czips/"
 	dirtyZipPath = "/app/zips/"
-	gpfdistAddr  = "gpfdist:8888"
 )
 
 const (
@@ -42,6 +39,9 @@ const (
 func init() {
 	if os.Getenv("TEST") != "" {
 		test_mode, _ = strconv.Atoi(os.Getenv("TEST"))
+	}
+	if os.Getenv("GPFDIST") != "" { // address for gpfdist
+		gpfdistAddr = os.Getenv("GPFDIST")
 	}
 }
 
@@ -195,50 +195,96 @@ func main() {
 		time.Sleep(5*time.Second)
 	}
 
+	// for iTest -> wait for init schema
+	if test_mode != 1 {
+		log.Println("sleeping 10 seconds, waiting for master parse to init db schema...")
+		time.Sleep(10 * time.Second)
+	}
+
 	// initialize schema for iTest if flag persist
+	// initialize schema in prod env ?
 	if test_mode == 1 {
 		log.Println("Init schema cdr_temp for iTest")
 		initSchema(db)
 	}
 
 	stopChan := make(chan bool)
-	z := archiver.NewTarGz()
-	z.CompressionLevel = flate.DefaultCompression
-	z.SingleThreaded = false
+	z := archiver.Zip{
+		CompressionLevel:       flate.DefaultCompression,
+		MkdirAll:               true,
+		SelectiveCompression:   true,
+		ContinueOnError:        false,
+		OverwriteExisting:      false,
+		ImplicitTopLevelFolder: false,
+	}
 	err = z.Create(os.Stdout)
 
 
 	if err != nil {
-		utils.HandleError(err, fmt.Sprintf("Err creating archiver with stdout writer"))
+		utils.HandleError(err, fmt.Sprintf("Err creating zip archiver with stdout writer"))
 	}
 	defer z.Close()
-	files, err := ioutil.ReadDir(dirtyZipPath)
-	if err != nil {
-		utils.HandleError(err, fmt.Sprintf("Err reading dir %s check permission granted", dirtyZipPath))
-		panic(err)
-	}
-	for _, f := range files {
-		if !f.IsDir() {
-			zipNames = append(zipNames, f.Name())
-		}
-	}
 
-	for _, zname := range zipNames {
+	////// out archiver compress to TarGz (supported gpfdist format)
+	tarz := archiver.NewTarGz()
+	tarz.CompressionLevel = flate.DefaultCompression
+	tarz.SingleThreaded = false
+	err = tarz.Create(os.Stdout)
+	if err != nil {
+		utils.HandleError(err, fmt.Sprintf("Err creating tar gz archiver with stdout writer"))
+	}
+	defer tarz.Close()
+
+
+	// implement async consume from rabbit
+	conn, err := amqp.Dial(fmt.Sprintf("amqp://guest:guest@%s:5672/", utils.RabbitServiceName))
+	utils.HandleError(err, "Can't connect to rabbit")
+	defer conn.Close()
+	amqpChannel, err := conn.Channel()
+	utils.HandleError(err, "Can't create AMQP channel")
+	defer amqpChannel.Close()
+	queue, err := amqpChannel.QueueDeclare(utils.ZipNamesQueue, true, false, false, false, nil)
+	utils.HandleError(err, "Couldn't declare 'add' queue")
+	err = amqpChannel.Qos(1, 0, false)
+	utils.HandleError(err, "Couldn't configure 'qos'")
+	messageChannel, err := amqpChannel.Consume(
+		queue.Name,
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+
+	utils.HandleError(err, "Couldn't register consumer")
+	// consume zipNames
+	for d := range messageChannel {
+		start := time.Now()
+		zipName := string(d.Body)
+		// should be accepting byte message in here
+		log.Println("Consumed message", zipName)
+
+		if err := d.Ack(false); err != nil {
+			log.Printf("Error acknowledging message : %s", err)
+		} else {
+			log.Printf("Acknowledged message")
+		}
 
 		// walkFn for each zip
-		err := z.Walk(dirtyZipPath+zname, func(f archiver.File) error {
+		err := z.Walk(dirtyZipPath+zipName, func(f archiver.File) error {
 			if f.IsDir() {
 				return nil
 			}
-			valz := utils.ReadCsv(f, zname)
-			cdrs := utils.ParseJob(valz)
+			valz := utils.ReadCsv(f, zipName)
+			cdrs := utils.ParseJob(valz) // makes copy, if passed by ref? no copy made -> ram optimiz?
 			utils.WriteJob(f.Name(), tmpDirName, cdrs)
 			return nil
 		})
 
 		// corrupted zip
 		if err != nil {
-			utils.HandleError(err, fmt.Sprintf("Corrupted zip with name %s, skipping...", zname))
+			utils.HandleError(err, fmt.Sprintf("Corrupted zip with name %s, skipping...", zipName))
 			if ok := utils.RemoveContents(tmpDirPath); ok != nil {
 				utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", tmpDirPath))
 			}
@@ -250,10 +296,12 @@ func main() {
 		if err != nil {
 			utils.HandleError(err, fmt.Sprintf("Err while reading contents of %s dir", tmpDirPath))
 		}
-
-		// produce cleanZip
-		z.Archive(files, fmt.Sprintf("%s%s", cleanZipPath, zname))
-
+		log.Println("Producing target targzip...", zipName)
+		// produce clean tarGZip\
+		err = tarz.Archive(files, fmt.Sprintf("%s%s", cleanZipPath, zipName[:len(zipName)-3] + "tar.gz"))
+		if err != nil {
+			panic(err)
+		}
 		// flush /tmp dir
 		if ok := utils.RemoveContents(tmpDirPath); ok != nil {
 			utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", tmpDirPath))
@@ -264,15 +312,16 @@ func main() {
 		batch := r.Intn((1 << 31) - 1)
 		// insertCleanZip into db
 		if ok := insertBatch(db, batch); ok != nil {
-			utils.HandleError(err, fmt.Sprintf("Err transaction with batch num %d", batch) )
+			utils.HandleError(err, fmt.Sprintf("Err transaction with batch num %d", batch))
 		}
 
-		// flush cleanZip
+		// flush /cleanzip on ramdisk
 		if ok := utils.RemoveContents(cleanZipPath); ok != nil {
 			utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", cleanZipPath))
 		}
 
-		log.Printf("Done loading zip %s with batch num %d", zname, batch)
+		log.Printf("Done loading zip %s with batch num %d", zipName, batch)
+		log.Println("Time took -", time.Since(start))
 	}
 
 	// blocking

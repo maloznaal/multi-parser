@@ -1,39 +1,130 @@
 version: '3'
 
 services:
-  parser:
+  parser1:
     build:
       context: .
       dockerfile: Dockerfile
     volumes: #volume to consume all zips from
-      - /Users/demo/volumes/test/zips:/app/zips
-      - /Users/demo/volumes/test/czips:/app/czips
-      - /Users/demo/volumes/test/smsc/logs:/var/log # test if logs persist
+      - /Users/demo/volumes/prod/testzips:/app/zips
+      - /Users/demo/volumes/test/gpfdist/1:/app/czips
     environment:
-      - TEST=1
+      - TEST=1 #to init schema for gpDb
+      - GPFDIST=gpfdist1:8888
     depends_on: # waiting for db up
       - master
       - segment
+      - smsrabbit
     networks:
       - backend
 
-  #checker service that ensures all data inserted correctly
-  checker:
+#  parser2:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    volumes: #volume to consume all zips from
+#      - /Users/demo/volumes/prod/testzips:/app/zips
+#      - /Users/demo/volumes/test/gpfdist/2:/app/czips
+#    environment:
+#      - TEST=0
+#      - GPFDIST=gpfdist2:8888
+#    depends_on: # waiting for db up
+#      - master
+#      - segment
+#      - smsrabbit
+#    networks:
+#      - backend
+#
+#  parser3:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    volumes: #volume to consume all zips from
+#      - /Users/demo/volumes/prod/testzips:/app/zips
+#      - /Users/demo/volumes/test/gpfdist/3:/app/czips
+#    environment:
+#      - TEST=0 # to not init schema twice, run prodMode
+#      - GPFDIST=gpfdist3:8888
+#    depends_on: # waiting for db up
+#      - master
+#      - segment
+#      - smsrabbit
+#    networks:
+#      - backend
+#
+#  parser4:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    volumes: #volume to consume all zips from
+#      - /Users/demo/volumes/prod/testzips:/app/zips
+#      - /Users/demo/volumes/test/gpfdist/4:/app/czips
+#    environment:
+#      - TEST=0 # to not init schema twice, run prodMode
+#      - GPFDIST=gpfdist4:8888
+#    depends_on: # waiting for db up
+#      - master
+#      - segment
+#      - smsrabbit
+#    networks:
+#      - backend
+
+  #rabbit-for-test
+  smsrabbit:
+    image: "rabbitmq:3-management"
+    hostname: "smsrabbit"
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+      RABBITMQ_DEFAULT_VHOST: "/"
+    ports:
+      - "15673:15672"
+      - "5673:5672"
+    networks:
+      - backend
+
+  #produce zipNames into queue
+  producer:
     build:
       context: .
-      dockerfile: checker.Dockerfile
-    depends_on:
-      - gpfdist
+      dockerfile: producer.Dockerfile
+    volumes:
+      - /Users/demo/volumes/prod/testzips:/zips
     networks:
       - backend
 
-  gpfdist:
+  #4 instances of gpfdist
+  gpfdist1:
     build: gp/gpfdist
     volumes:
-      - /Users/demo/volumes/test/czips:/files/
+      - /Users/demo/volumes/test/gpfdist/1:/files/
     command: /usr/lib/gpdb/bin/gpfdist -d /files/ -p 8888
     networks:
         - backend
+
+  gpfdist2:
+    build: gp/gpfdist
+    volumes:
+      - /Users/demo/volumes/test/gpfdist/2:/files/
+    command: /usr/lib/gpdb/bin/gpfdist -d /files/ -p 8888
+    networks:
+      - backend
+
+  gpfdist3:
+    build: gp/gpfdist
+    volumes:
+      - /Users/demo/volumes/test/gpfdist/3:/files/
+    command: /usr/lib/gpdb/bin/gpfdist -d /files/ -p 8888
+    networks:
+      - backend
+
+  gpfdist4:
+    build: gp/gpfdist
+    volumes:
+      - /Users/demo/volumes/test/gpfdist/4:/files/
+    command: /usr/lib/gpdb/bin/gpfdist -d /files/ -p 8888
+    networks:
+      - backend
 
   #gp for itest
   master:
@@ -49,6 +140,16 @@ services:
     networks:
       - backend
 
+
+  #checker service that ensures all data inserted correctly
+#  checker:
+#    build:
+#      context: .
+#      dockerfile: checker.Dockerfile
+#    depends_on:
+#      - gpfdist
+#    networks:
+#      - backend
 
 
 

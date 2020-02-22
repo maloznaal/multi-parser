@@ -30,6 +30,10 @@ const (
 	mscPos = 13
 )
 
+// name of zips to consume zip names from
+const ZipNamesQueue = "ZipNames"
+const RabbitServiceName = "smsrabbit"
+
 // HandleError handles error
 func HandleError(err error, msg string) {
 	if err != nil {
@@ -45,7 +49,7 @@ func TimeTrack(start time.Time, name string) {
 
 // ReadCsv - reads csv file into valz
 func ReadCsv(f archiver.File, zipName string) [][]string {
-	valz := make([][]string, 0)
+	valz := make([][]string, 0, 50000)
 	csvr := csv.NewReader(f)
 	for {
 		row, err := csvr.Read()
@@ -104,15 +108,15 @@ func WriteJob(file string, dir string, cdrs []CDR) {
 // ParseJob parses slice of strings in place -> ready for writing
 func ParseJob(valz [][]string) []CDR{
 	recID := ""
-	cdrs := make([]CDR, 0)
+	cdrs := make([]CDR, 0, 50000) // no alloc on huge csv-s
 	for _, chunks := range valz {
 		c, r := chunks[num1Pos], chunks[num2Pos]
-		suf := c[3:]
+		suf := c[Min(3, Max(int32(len(c)-1), 0)):]
 		if len(c) > 11 && AreDigits(suf) && isDirty(c[:3]) {
 			chunks[3] = suf
 		}
 
-		suf = r[3:]
+		suf = r[Min(3, Max(int32(len(r)-1), 0)):]
 		if len(r) > 11 && AreDigits(suf) && isDirty(r[:3]) {
 			chunks[4] = suf
 		}
@@ -144,7 +148,6 @@ func ParseJob(valz [][]string) []CDR{
 		} else {
 			cdr.RecordType = 18000
 		}
-
 
 		ts, err := PostgresTime(chunks[datePos])
 		if err != nil {
@@ -225,6 +228,21 @@ func isDirty(pref string) bool {
 	}
 	return true
 }
+
+func Min(x, y int32) int32 {
+	if x > y {
+		return y
+	}
+	return x
+}
+
+func Max(x, y int32) int32 {
+	if x < y {
+		return y
+	}
+	return x
+}
+
 
 // Gen  - generates all permuts of size k=3 with alphabet size - n, excluding all only digit subsets from result set
 //func Gen(n int, k int, res string, m *map[string]bool) {

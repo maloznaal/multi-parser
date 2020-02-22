@@ -74,7 +74,7 @@ func NewCdr() CDR {
 	c.RoamingNumber = "-"
 	c.SsCode = "-"
 	c.Ussd = "-"
-	c.OperatorID = -1
+	c.OperatorID = 323959
 	c.DateAndTime = time.Time{}
 	c.CallDirection = -1
 	c.SeizureTime = time.Time{}

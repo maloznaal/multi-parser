@@ -4,7 +4,6 @@ RUN apk update && apk upgrade && \
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
-RUN mkdir tmp
 COPY . .
-RUN go build -o main .
-CMD ["./main"]
+RUN go build cmd/producer/producer.go
+CMD ["./producer"]

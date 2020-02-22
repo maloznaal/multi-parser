@@ -37,7 +37,7 @@ func getRows(db *sql.DB) []utils.CDR {
 	}
 
 	defer rows.Close()
-	cdrs := make([]utils.CDR, 0)
+	cdrs := make([]utils.CDR, 0, insertedRowsNum)
 	cdr := utils.NewCdr()
 	for rows.Next() {
 		if err := rows.Scan(&cdr.RecordType, &cdr.RecordID, &cdr.StartTimestamp,
