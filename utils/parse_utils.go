@@ -149,7 +149,7 @@ func ParseJob(valz [][]string) []CDR{
 			cdr.RecordType = 18000
 		}
 
-		if len(cdr.CalledPartyNumber) > 9 && len(cdr.CallingPartyNumber) > 9 {
+		if len(cdr.CalledPartyNumber) > 9 && len(cdr.CallingPartyNumber) > 9 && !AreDigits(cdr.CalledPartyNumber) && !AreDigits(cdr.CallingPartyNumber) {
 			cdr.RecordType = 18002 // mobile to mobile
 		}
 
