@@ -149,6 +149,10 @@ func ParseJob(valz [][]string) []CDR{
 			cdr.RecordType = 18000
 		}
 
+		if len(cdr.CalledPartyNumber) > 9 && len(cdr.CallingPartyNumber) > 9 {
+			cdr.RecordType = 18002 // mobile to mobile
+		}
+
 		ts, err := PostgresTime(chunks[datePos])
 		if err != nil {
 			HandleError(err, "err parsing time")
