@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 )
 
 const (
@@ -28,6 +27,9 @@ const (
 	statusPos = 8
 	imsiPos = 12
 	mscPos = 13
+	MO = 18000
+	MT = 18001
+	MTM = 18002
 )
 
 // name of zips to consume zip names from
@@ -142,15 +144,18 @@ func ParseJob(valz [][]string) []CDR{
 			cdr.CalledPartyNumber = chunks[num1Pos]
 		}
 
-		// number < 9 digits, abonent
-		if len(cdr.CalledPartyNumber) < 9 || !AreDigits(cdr.CalledPartyNumber) {
-			cdr.RecordType = 18001
+		// explicit check
+		if !AreDigits(cdr.CallingPartyNumber) {
+			cdr.RecordType = MT
 		} else {
-			cdr.RecordType = 18000
+			cdr.RecordType = MO
 		}
 
-		if len(cdr.CalledPartyNumber) > 9 && len(cdr.CallingPartyNumber) > 9 && !AreDigits(cdr.CalledPartyNumber) && !AreDigits(cdr.CallingPartyNumber) {
-			cdr.RecordType = 18002 // mobile to mobile
+		if len(cdr.CalledPartyNumber) > 9 && len(cdr.CallingPartyNumber) > 9 && AreDigits(cdr.CalledPartyNumber) && AreDigits(cdr.CallingPartyNumber) {
+			cdr.RecordType = MTM
+		}
+		if cdr.CallingPartyNumber == "" && cdr.CalledPartyNumber == "" {
+			cdr.RecordType = -1
 		}
 
 		ts, err := PostgresTime(chunks[datePos])
@@ -223,7 +228,7 @@ func AreDigits(suf string) bool {
 func isDirty(pref string) bool {
 	cntL := 0
 	for _, c := range pref {
-		if unicode.IsLetter(c) {
+		if c >= 'A' && c <= 'E' {
 			cntL++
 		}
 	}
