@@ -145,7 +145,7 @@ func ParseJob(valz [][]string) []CDR{
 		}
 
 		// explicit check
-		if !AreDigits(cdr.CallingPartyNumber) {
+		if !AreDigits(cdr.CallingPartyNumber) || len(cdr.CallingPartyNumber) < 9 {
 			cdr.RecordType = MT
 		} else {
 			cdr.RecordType = MO

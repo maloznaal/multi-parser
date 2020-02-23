@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"offline_parser/utils"
+	"os"
 	"time"
 
 	"github.com/streadway/amqp"
@@ -54,7 +55,6 @@ func main() {
 	}
 
 	log.Printf("Producing %d zipnames...", len(zipNames))
-	stopChan := make(chan bool)
 	for _, name := range zipNames {
 		// do need encode/decode?
 		err = amqpChannel.Publish("", queue.Name, false, false, amqp.Publishing{
@@ -69,6 +69,5 @@ func main() {
 		log.Printf("Producing task with name %s", name)
 	}
 	log.Println("DONE PRODUCING!")
-	// blocks
-	<-stopChan
+	os.Exit(1)
 }

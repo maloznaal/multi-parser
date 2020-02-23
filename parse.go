@@ -197,43 +197,27 @@ func main() {
 
 	// for iTest -> wait for init schema
 	if test_mode != 1 {
-		log.Println("sleeping 10 seconds, waiting for master parse to init db schema...")
+		log.Println("Sleeping 10 seconds, waiting for master parse to init db schema...")
 		time.Sleep(10 * time.Second)
 	}
 
 	// initialize schema for iTest if flag persist
-	// initialize schema in prod env ?
 	if test_mode == 1 {
 		log.Println("Init schema cdr_temp for iTest")
 		initSchema(db)
 	}
 
 	stopChan := make(chan bool)
-	z := archiver.Zip{
-		CompressionLevel:       flate.DefaultCompression,
-		MkdirAll:               true,
-		SelectiveCompression:   true,
-		ContinueOnError:        false,
-		OverwriteExisting:      false,
-		ImplicitTopLevelFolder: false,
-	}
+
+	// out archiver compress to TarGz (supported gpfdist format)
+	z := archiver.NewTarGz()
+	z.CompressionLevel = flate.DefaultCompression
+	z.SingleThreaded = false
 	err = z.Create(os.Stdout)
-
-
-	if err != nil {
-		utils.HandleError(err, fmt.Sprintf("Err creating zip archiver with stdout writer"))
-	}
-	defer z.Close()
-
-	////// out archiver compress to TarGz (supported gpfdist format)
-	tarz := archiver.NewTarGz()
-	tarz.CompressionLevel = flate.DefaultCompression
-	tarz.SingleThreaded = false
-	err = tarz.Create(os.Stdout)
 	if err != nil {
 		utils.HandleError(err, fmt.Sprintf("Err creating tar gz archiver with stdout writer"))
 	}
-	defer tarz.Close()
+	defer z.Close()
 
 
 	// implement async consume from rabbit
@@ -262,7 +246,6 @@ func main() {
 	for d := range messageChannel {
 		start := time.Now()
 		zipName := string(d.Body)
-		// should be accepting byte message in here
 		log.Println("Consumed message", zipName)
 
 		if err := d.Ack(false); err != nil {
@@ -277,7 +260,7 @@ func main() {
 				return nil
 			}
 			valz := utils.ReadCsv(f, zipName)
-			cdrs := utils.ParseJob(valz) // makes copy, if passed by ref? no copy made -> ram optimiz?
+			cdrs := utils.ParseJob(valz)
 			utils.WriteJob(f.Name(), tmpDirName, cdrs)
 			return nil
 		})
@@ -291,21 +274,17 @@ func main() {
 			continue // skip zip
 		}
 
-		files, err := filepath.Glob(fmt.Sprintf("%s*", tmpDirPath))
-
+		err = produceZip(zipName, z)
 		if err != nil {
-			utils.HandleError(err, fmt.Sprintf("Err while reading contents of %s dir", tmpDirPath))
-		}
-		log.Println("Producing target targzip...", zipName)
-		// produce clean tarGZip\
-		err = tarz.Archive(files, fmt.Sprintf("%s%s", cleanZipPath, zipName[:len(zipName)-3] + "tar.gz"))
-		if err != nil {
+			utils.HandleError(err, "Err producing")
 			panic(err)
 		}
+		log.Println("produce with success")
+
 		// flush /tmp dir
-		if ok := utils.RemoveContents(tmpDirPath); ok != nil {
-			utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", tmpDirPath))
-		}
+		//if ok := utils.RemoveContents(tmpDirPath); ok != nil {
+		//	utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", tmpDirPath))
+		//}
 
 		s := rand.NewSource(time.Now().UnixNano())
 		r := rand.New(s)
@@ -316,14 +295,27 @@ func main() {
 		}
 
 		// flush /cleanzip on ramdisk
-		if ok := utils.RemoveContents(cleanZipPath); ok != nil {
-			utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", cleanZipPath))
-		}
+		//if ok := utils.RemoveContents(cleanZipPath); ok != nil {
+		//	utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", cleanZipPath))
+		//}
 
 		log.Printf("Done loading zip %s with batch num %d", zipName, batch)
 		log.Println("Time took -", time.Since(start))
 	}
-
 	// blocking
 	<-stopChan
+}
+
+
+func produceZip(zipName string, z *archiver.TarGz) error {
+	files, err := filepath.Glob(fmt.Sprintf("%s*", tmpDirPath))
+	if err != nil {
+		utils.HandleError(err, fmt.Sprintf("Err while reading contents of %s dir", tmpDirPath))
+	}
+	log.Println("Producing clean tar gzip -", zipName)
+	err = z.Archive(files, fmt.Sprintf("%s%s", cleanZipPath, zipName))
+	if err != nil {
+		return err
+	}
+	return nil
 }
