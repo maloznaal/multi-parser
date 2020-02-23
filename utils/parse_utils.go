@@ -49,7 +49,7 @@ func TimeTrack(start time.Time, name string) {
 	log.Printf("%s took %s", name, dur)
 }
 
-// ReadCsv - reads csv file into valz
+// ReadCsv - reads csv file into
 func ReadCsv(f archiver.File, zipName string) [][]string {
 	valz := make([][]string, 0, 50000)
 	csvr := csv.NewReader(f)
@@ -85,6 +85,12 @@ func WriteJob(file string, dir string, cdrs []CDR) {
 	}
 	for _, cdr := range cdrs {
 		data := cdr.csvRow()
+
+		// ensure no null characters pass by
+		for _, s := range data {
+			//s = strings.Replace(s, "\x00", "", -1)
+			s = strings.Trim(s, "\x00")
+		}
 
 		err = writer.Write(data)
 		if err != nil {

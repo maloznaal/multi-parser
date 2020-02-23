@@ -213,6 +213,7 @@ func main() {
 	z := archiver.NewTarGz()
 	z.CompressionLevel = flate.DefaultCompression
 	z.SingleThreaded = false
+	z.OverwriteExisting = true
 	err = z.Create(os.Stdout)
 	if err != nil {
 		utils.HandleError(err, fmt.Sprintf("Err creating tar gz archiver with stdout writer"))
@@ -282,9 +283,9 @@ func main() {
 		log.Println("produce with success")
 
 		// flush /tmp dir
-		//if ok := utils.RemoveContents(tmpDirPath); ok != nil {
-		//	utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", tmpDirPath))
-		//}
+		if ok := utils.RemoveContents(tmpDirPath); ok != nil {
+			utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", tmpDirPath))
+		}
 
 		s := rand.NewSource(time.Now().UnixNano())
 		r := rand.New(s)
@@ -295,9 +296,9 @@ func main() {
 		}
 
 		// flush /cleanzip on ramdisk
-		//if ok := utils.RemoveContents(cleanZipPath); ok != nil {
-		//	utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", cleanZipPath))
-		//}
+		if ok := utils.RemoveContents(cleanZipPath); ok != nil {
+			utils.HandleError(ok, fmt.Sprintf("Error removing contents at path %s", cleanZipPath))
+		}
 
 		log.Printf("Done loading zip %s with batch num %d", zipName, batch)
 		log.Println("Time took -", time.Since(start))

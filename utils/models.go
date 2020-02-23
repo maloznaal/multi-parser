@@ -1,24 +1,23 @@
 package utils
 
 import (
-	"strconv"
 	"time"
 )
 
 // CDR record
 type CDR struct {
-	RecordType            int
+	RecordType            int32
 	RecordID              int32
 	StartTimestamp        time.Time
 	CallingPartyNumber    string
 	CalledPartyNumber     string
 	RedirectingNumber     string
-	CallIDNumber          int
+	CallIDNumber          int32
 	SupplementaryServices string
-	Cause                 int
-	CallingPartyCategory  int
-	CallDuration          int
-	CallStatus            int
+	Cause                 int32
+	CallingPartyCategory  int32
+	CallDuration          int32
+	CallStatus            int32
 	ConnectedNumber       string
 	ImsiCalling           string
 	ImeiCalling           string
@@ -27,16 +26,16 @@ type CDR struct {
 	MsisdnCalling         string
 	MsisdnCalled          string
 	MscNumber             string
-	VlrNumber             int
-	LocationLac           int
-	LocationCell          int
-	ForwardingReason      int
+	VlrNumber             int32
+	LocationLac           int32
+	LocationCell          int32
+	ForwardingReason      int32
 	RoamingNumber         string
 	SsCode                string
 	Ussd                  string
-	OperatorID            int
+	OperatorID            int32
 	DateAndTime           time.Time
-	CallDirection         int
+	CallDirection         int32
 	SeizureTime           time.Time
 	AnswerTime            time.Time
 	ReleaseTime           time.Time
@@ -87,30 +86,30 @@ func NewCdr() CDR {
 // return slice of strings[] -> for csv write
 func (c CDR) csvRow() []string {
 	cdrs := make([]string, 0)
-	cdrs = append(cdrs, strconv.Itoa(c.RecordType))
+	cdrs = append(cdrs, fastConvert(c.RecordType))
 
 	cdrs = append(cdrs, fastConvert(c.RecordID))
 	cdrs = append(cdrs, c.DateToWrite)
 	cdrs = append(cdrs, c.CallingPartyNumber)
 	cdrs = append(cdrs, c.CalledPartyNumber)
 	cdrs = append(cdrs, c.RedirectingNumber)
-	cdrs = append(cdrs, strconv.Itoa(c.CallIDNumber))
+	cdrs = append(cdrs, fastConvert(c.CallIDNumber))
 	cdrs = append(cdrs, c.SupplementaryServices)
-	cdrs = append(cdrs, strconv.Itoa(c.Cause))
+	cdrs = append(cdrs, fastConvert(c.Cause))
 
-	cdrs = append(cdrs, strconv.Itoa(c.CallingPartyCategory))
-	cdrs = append(cdrs, strconv.Itoa(c.CallDuration))
-	cdrs = append(cdrs, strconv.Itoa(c.CallStatus))
+	cdrs = append(cdrs, fastConvert(c.CallingPartyCategory))
+	cdrs = append(cdrs, fastConvert(c.CallDuration))
+	cdrs = append(cdrs, fastConvert(c.CallStatus))
 	cdrs = append(cdrs, c.ConnectedNumber)
 	cdrs = append(cdrs, c.ImsiCalling)
 	cdrs = append(cdrs, c.ImeiCalling)
 	cdrs = append(cdrs, c.ImsiCalled)
 	cdrs = append(cdrs, c.ImeiCalled, c.MsisdnCalling, c.MsisdnCalled, c.MscNumber)
-	cdrs = append(cdrs, strconv.Itoa(c.VlrNumber), strconv.Itoa(c.LocationLac), strconv.Itoa(c.LocationCell), strconv.Itoa(c.ForwardingReason))
+	cdrs = append(cdrs, fastConvert(c.VlrNumber), fastConvert(c.LocationLac), fastConvert(c.LocationCell), fastConvert(c.ForwardingReason))
 	cdrs = append(cdrs, c.RoamingNumber, c.SsCode, c.Ussd)
-	cdrs = append(cdrs, strconv.Itoa(c.OperatorID))
+	cdrs = append(cdrs, fastConvert(c.OperatorID))
 	cdrs = append(cdrs, c.DateToWrite)
-	cdrs = append(cdrs, strconv.Itoa(c.CallDirection))
+	cdrs = append(cdrs, fastConvert(c.CallDirection))
 	cdrs = append(cdrs, c.DateToWrite, c.DateToWrite, c.DateToWrite) // time.Time
 
 	return cdrs

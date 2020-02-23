@@ -24,9 +24,8 @@ func handleError(err error, msg string) {
 
 func main() {
 
-	// wait untill rabbit is up
+	// wait until rabbit is up
 	time.Sleep(20 * time.Second)
-	log.Println("PRODUCER CALLING RABBIT")
 	conn, err := amqp.Dial(fmt.Sprintf("amqp://guest:guest@%s:5672/", utils.RabbitServiceName))
 	handleError(err, "Can't connect to AMQP")
 	defer conn.Close()
@@ -47,9 +46,9 @@ func main() {
 	}
 
 
-	zipNames := make([]string, 0, 0)
+	zipNames := make([]string, 0, 1000)
 	for _, f := range files {
-		if !f.IsDir() {
+		if !f.IsDir() && f.Name()[len(f.Name())-2:] == "gz" {
 			zipNames = append(zipNames, f.Name())
 		}
 	}
